@@ -2,7 +2,7 @@
 
 **An Audio Note-Taking Solution Using Flutter**
 
-VoiceNotes is a modern, cross-platform mobile application built with Flutter that allows users to record, organize, and manage voice notes with ease. The app features a beautiful material design interface with both light and dark theme support.
+VoiceNotes is a modern, cross-platform mobile application built with Flutter that allows users to record, organize, and manage voice notes with ease. The app features a beautiful material design interface.
 
 ## 🌟 Features
 
@@ -185,9 +185,6 @@ We welcome contributions to VoiceNotes! Please follow these steps:
 - Large audio files (>10 minutes) may impact performance
 - iOS simulator doesn't support audio recording
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
