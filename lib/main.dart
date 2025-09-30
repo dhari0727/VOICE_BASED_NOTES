@@ -47,7 +47,7 @@ class VoiceNotesApp extends StatelessWidget {
               color: Color(0xFF2D3436),
             ),
           ),
-          cardTheme: CardTheme(
+          cardTheme: CardThemeData(
             elevation: 8,
             shadowColor: const Color(0xFF6C5CE7).withOpacity(0.15),
             shape: RoundedRectangleBorder(
@@ -168,7 +168,7 @@ class VoiceNotesApp extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          cardTheme: CardTheme(
+          cardTheme: CardThemeData(
             elevation: 8,
             shadowColor: const Color(0xFF6C5CE7).withOpacity(0.3),
             shape: RoundedRectangleBorder(
