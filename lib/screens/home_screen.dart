@@ -20,6 +20,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
 
+  // In-memory set of protected note IDs (session-only)
+  final Set<int> _protectedNoteIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -32,6 +35,80 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Returns true if the note is currently protected (session-only)
+  bool _isProtected(VoiceNote note) {
+    // If note.id can be null, treat null as unprotected
+    if (note.id == null) return false;
+    return _protectedNoteIds.contains(note.id);
+  }
+
+  /// Toggle protection for a note (session-only)
+  void _toggleProtection(VoiceNote note) {
+    if (note.id == null) return;
+    setState(() {
+      if (_protectedNoteIds.contains(note.id)) {
+        _protectedNoteIds.remove(note.id);
+      } else {
+        _protectedNoteIds.add(note.id!);
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _protectedNoteIds.contains(note.id)
+              ? 'Note protected'
+              : 'Note unprotected',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// Prompt for the PIN and return true if correct.
+  /// PIN is hard-coded to '1234' as requested.
+  Future<bool> _promptForPin() async {
+    final controller = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Enter PIN'),
+          content: TextField(
+            controller: controller,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            decoration: const InputDecoration(hintText: '4-digit PIN'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (controller.text.trim() == '1234') {
+                  Navigator.of(ctx).pop(true);
+                } else {
+                  // show inline feedback via SnackBar but keep dialog open
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Incorrect PIN')),
+                  );
+                }
+              },
+              child: const Text('Open'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result == true;
   }
 
   @override
@@ -98,57 +175,114 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 Expanded(
-                  child:
-                      provider.isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : provider.voiceNotes.isEmpty
+                  child: provider.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : provider.voiceNotes.isEmpty
                           ? _buildEmptyState(context, provider)
                           : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: provider.voiceNotes.length,
-                            itemBuilder: (context, index) {
-                              final note = provider.voiceNotes[index];
-                              return AnimationConfiguration.staggeredList(
-                                position: index,
-                                duration: const Duration(milliseconds: 375),
-                                child: SlideAnimation(
-                                  verticalOffset: 50.0,
-                                  child: FadeInAnimation(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 12,
-                                      ),
-                                      child: VoiceNoteCard(
-                                        voiceNote: note,
-                                        onPlay:
-                                            () => provider.playVoiceNote(note),
-                                        onEdit:
-                                            () => _navigateToEditNote(
-                                              context,
-                                              note,
-                                            ),
-                                        onDelete:
-                                            () => _showDeleteDialog(
-                                              context,
-                                              note,
-                                            ),
-                                        isPlaying:
-                                            provider.currentlyPlayingId ==
-                                            note.id.toString(),
-                                        playbackPosition:
-                                            provider.playbackPosition,
-                                        playbackDuration:
-                                            provider.playbackDuration,
-                                        onSeek:
-                                            (position) => provider
-                                                .seekToPosition(position),
+                              padding: const EdgeInsets.all(16),
+                              itemCount: provider.voiceNotes.length,
+                              itemBuilder: (context, index) {
+                                final note = provider.voiceNotes[index];
+                                final protected = _isProtected(note);
+
+                                // Wrap the existing VoiceNoteCard in a Stack so we can
+                                // overlay a lock badge when protected. We also intercept
+                                // onPlay and onEdit to require PIN for protected notes.
+                                return AnimationConfiguration.staggeredList(
+                                  position: index,
+                                  duration: const Duration(milliseconds: 375),
+                                  child: SlideAnimation(
+                                    verticalOffset: 50.0,
+                                    child: FadeInAnimation(
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 12),
+                                        child: GestureDetector(
+                                          onLongPress: () {
+                                            // Toggle protection on long press
+                                            _toggleProtection(note);
+                                          },
+                                          child: Stack(
+                                            children: [
+                                              VoiceNoteCard(
+                                                voiceNote: note,
+                                                onPlay: () async {
+                                                  if (!protected) {
+                                                    provider.playVoiceNote(note);
+                                                    return;
+                                                  }
+                                                  final ok = await _promptForPin();
+                                                  if (ok) {
+                                                    provider.playVoiceNote(note);
+                                                  }
+                                                },
+                                                onEdit: () async {
+                                                  if (!protected) {
+                                                    _navigateToEditNote(
+                                                      context,
+                                                      note,
+                                                    );
+                                                    return;
+                                                  }
+                                                  final ok = await _promptForPin();
+                                                  if (ok) {
+                                                    _navigateToEditNote(
+                                                      context,
+                                                      note,
+                                                    );
+                                                  }
+                                                },
+                                                onDelete: () => _showDeleteDialog(
+                                                  context,
+                                                  note,
+                                                ),
+                                                isPlaying: provider
+                                                        .currentlyPlayingId ==
+                                                    note.id.toString(),
+                                                playbackPosition:
+                                                    provider.playbackPosition,
+                                                playbackDuration:
+                                                    provider.playbackDuration,
+                                                onSeek: (position) => provider
+                                                    .seekToPosition(position),
+                                              ),
+                                              // lock badge
+                                              if (protected)
+                                                Positioned(
+                                                  right: 6,
+                                                  top: 6,
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.all(6),
+                                                    decoration: BoxDecoration(
+                                                      color: Theme.of(context)
+                                                          .cardColor
+                                                          .withOpacity(0.9),
+                                                      shape: BoxShape.circle,
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color:
+                                                              Colors.black12,
+                                                          blurRadius: 4,
+                                                        )
+                                                      ],
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.lock,
+                                                      size: 16,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
+                                );
+                              },
+                            ),
                 ),
               ],
             );
