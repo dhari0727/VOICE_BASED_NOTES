@@ -41,6 +41,23 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
   void initState() {
     super.initState();
     _initializeControllers();
+    // Fallback: if no initial transcript was provided, but provider still holds
+    // a live transcript, populate it after first frame.
+    if (!isEditing && (widget.initialTranscript == null || widget.initialTranscript!.trim().isEmpty)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          final provider = context.read<VoiceNotesProvider>();
+          final live = provider.liveTranscript;
+          if (live != null && live.trim().isNotEmpty && _transcriptController.text.trim().isEmpty) {
+            setState(() {
+              _transcriptController.text = live.trim();
+            });
+          }
+        } catch (_) {
+          // ignore: empty_catches
+        }
+      });
+    }
   }
 
   void _initializeControllers() {
@@ -78,6 +95,9 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool showTranscriptField =
+        _transcriptController.text.trim().isNotEmpty ||
+        (isEditing && (widget.voiceNote!.transcript?.trim().isNotEmpty ?? false));
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
       appBar: AppBar(
@@ -109,8 +129,10 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
             _buildDescriptionField(),
             const SizedBox(height: 16),
             _buildTagsSection(),
-          const SizedBox(height: 16),
-          _buildTranscriptEditor(),
+          if (showTranscriptField) ...[
+            const SizedBox(height: 16),
+            _buildTranscriptEditor(),
+          ],
             if (_error != null) ...[
               const SizedBox(height: 16),
               _buildErrorCard(),
