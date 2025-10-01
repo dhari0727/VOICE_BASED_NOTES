@@ -3,6 +3,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:audioplayers/audioplayers.dart' as audio;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:voice_based_notes/services/transcription_service.dart';
 
 enum AudioState { recording, playing, paused, stopped, ready }
 
@@ -15,6 +16,11 @@ class AudioService {
   audio.AudioPlayer? _player;
   String? _currentRecordingPath;
   String? _currentPlayingPath;
+
+  // Transcription wiring: enable live partials and final transcript callbacks
+  final TranscriptionService _transcription = TranscriptionService();
+  Function(String)? onTranscriptPartial;
+  Function(String)? onTranscriptFinal;
 
   AudioState _state = AudioState.stopped;
   AudioState get state => _state;
@@ -157,6 +163,33 @@ class AudioService {
       _updateState(AudioState.recording);
       _startRecordingTimer();
 
+      // Best-effort transcription start (non-blocking, errors are logged only)
+      // Initialize is idempotent per TranscriptionService contract
+      try {
+        final ok = await _transcription.initialize();
+        if (ok) {
+          await _transcription.startListening(
+            onPartial: (s) {
+              final partial = s.trim();
+              if (partial.isNotEmpty) {
+                onTranscriptPartial?.call(partial);
+              }
+            },
+          );
+        } else {
+          // Do not interrupt recording if transcription unavailable
+          // Keep a helpful log for debugging
+          // ignore: avoid_print
+          print('Transcription unavailable — proceeding with audio-only recording');
+        }
+      } catch (e, st) {
+        // Non-blocking failure
+        // ignore: avoid_print
+        print('Failed to start transcription: $e');
+        // ignore: avoid_print
+        print(st);
+      }
+
       return _currentRecordingPath;
     } catch (e) {
       throw Exception('Failed to start recording: $e');
@@ -180,6 +213,51 @@ class AudioService {
     } catch (e) {
       throw Exception('Failed to stop recording: $e');
     }
+  }
+
+  /// Stop recording and return both the saved file path and the final transcript.
+  /// This method preserves backward compatibility by not altering `stopRecording()`
+  /// semantics; it captures the path before stopping to ensure it is available
+  /// even if the underlying field is cleared by other flows.
+  Future<Map<String, String?>> stopRecordingAndGetTranscript() async {
+    if (_recorder == null || _state != AudioState.recording) {
+      throw Exception('Not currently recording');
+    }
+
+    // Capture current path before stopping (in case other flows clear it)
+    final pathBeforeStop = _currentRecordingPath;
+
+    String? transcript;
+    try {
+      await _recorder!.stopRecorder();
+      _updateState(AudioState.stopped);
+    } catch (e) {
+      throw Exception('Failed to stop recording: $e');
+    } finally {
+      // Reset recording timer/state bookkeeping
+      _recordingDuration = Duration.zero;
+      _currentRecordingPath = null;
+    }
+
+    // Best-effort: stop listening and read final transcript
+    try {
+      final finalText = await _transcription.stopListening();
+      transcript = finalText?.trim().isEmpty == true ? null : finalText?.trim();
+      if ((transcript ?? '').isNotEmpty) {
+        onTranscriptFinal?.call(transcript!);
+      }
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('Failed to finalize transcription: $e');
+      // ignore: avoid_print
+      print(st);
+      transcript = null;
+    }
+
+    return {
+      'path': pathBeforeStop,
+      'transcript': transcript,
+    };
   }
 
   Future<void> playAudio(String filePath) async {
