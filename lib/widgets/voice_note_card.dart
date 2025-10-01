@@ -13,6 +13,10 @@ class VoiceNoteCard extends StatelessWidget {
   final Function(Duration) onSeek;
   final VoidCallback? onToggleFavorite;
   final VoidCallback? onTogglePinned;
+  final VoidCallback? onShareTxt;
+  final VoidCallback? onSharePdf;
+  final VoidCallback? onShareAudio;
+  final VoidCallback? onSummarize;
 
   const VoiceNoteCard({
     super.key,
@@ -26,6 +30,10 @@ class VoiceNoteCard extends StatelessWidget {
     required this.onSeek,
     this.onToggleFavorite,
     this.onTogglePinned,
+    this.onShareTxt,
+    this.onSharePdf,
+    this.onShareAudio,
+    this.onSummarize,
   });
 
   @override
@@ -112,6 +120,18 @@ class VoiceNoteCard extends StatelessWidget {
               case 'delete':
                 onDelete();
                 break;
+              case 'share_txt':
+                onShareTxt?.call();
+                break;
+              case 'share_pdf':
+                onSharePdf?.call();
+                break;
+              case 'share_audio':
+                onShareAudio?.call();
+                break;
+              case 'summarize':
+                onSummarize?.call();
+                break;
             }
           },
           itemBuilder:
@@ -133,6 +153,46 @@ class VoiceNoteCard extends StatelessWidget {
                       Icon(Icons.delete, size: 16, color: Colors.red),
                       SizedBox(width: 8),
                       Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'share_txt',
+                  child: Row(
+                    children: const [
+                      Icon(Icons.description, size: 16),
+                      SizedBox(width: 8),
+                      Text('Share as TXT'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'share_pdf',
+                  child: Row(
+                    children: const [
+                      Icon(Icons.picture_as_pdf, size: 16),
+                      SizedBox(width: 8),
+                      Text('Share as PDF'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'share_audio',
+                  child: Row(
+                    children: const [
+                      Icon(Icons.audiotrack, size: 16),
+                      SizedBox(width: 8),
+                      Text('Share audio'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'summarize',
+                  child: Row(
+                    children: const [
+                      Icon(Icons.summarize, size: 16),
+                      SizedBox(width: 8),
+                      Text('Generate summary'),
                     ],
                   ),
                 ),

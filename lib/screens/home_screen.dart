@@ -281,6 +281,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                                       voiceNote: note,
                                                       isPinned: !note.isPinned,
                                                     ),
+                                                onShareTxt: () => context
+                                                    .read<VoiceNotesProvider>()
+                                                    .exportAndShareTxt(note),
+                                                onSharePdf: () => context
+                                                    .read<VoiceNotesProvider>()
+                                                    .exportAndSharePdf(note),
+                                                onShareAudio: () => context
+                                                    .read<VoiceNotesProvider>()
+                                                    .shareAudio(note),
+                                                onSummarize: () async {
+                                                  final ok = await context
+                                                      .read<VoiceNotesProvider>()
+                                                      .generateSummary(note);
+                                                  if (!mounted) return;
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(ok ? 'Summary generated' : 'Failed to generate summary'),
+                                                    ),
+                                                  );
+                                                },
                                               ),
                                               // lock badge
                                               if (protected)

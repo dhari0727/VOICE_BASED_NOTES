@@ -26,7 +26,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -46,7 +46,11 @@ class DatabaseService {
         transcript TEXT,
         languageCode TEXT,
         isFavorite INTEGER DEFAULT 0,
-        isPinned INTEGER DEFAULT 0
+        isPinned INTEGER DEFAULT 0,
+        summary TEXT,
+        remoteId TEXT,
+        lastSyncedAt INTEGER,
+        isEncrypted INTEGER DEFAULT 0
       )
     ''');
 
@@ -62,6 +66,12 @@ class DatabaseService {
       await _safeAddColumn(db, 'voice_notes', 'isFavorite', 'INTEGER DEFAULT 0');
       await _safeAddColumn(db, 'voice_notes', 'isPinned', 'INTEGER DEFAULT 0');
       await _createFtsObjects(db);
+    }
+    if (oldVersion < 3) {
+      await _safeAddColumn(db, 'voice_notes', 'summary', 'TEXT');
+      await _safeAddColumn(db, 'voice_notes', 'remoteId', 'TEXT');
+      await _safeAddColumn(db, 'voice_notes', 'lastSyncedAt', 'INTEGER');
+      await _safeAddColumn(db, 'voice_notes', 'isEncrypted', 'INTEGER DEFAULT 0');
     }
   }
 

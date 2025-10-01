@@ -3,11 +3,20 @@ import '../models/voice_note.dart';
 import '../services/database_service.dart';
 import '../services/audio_service.dart';
 import '../services/transcription_service.dart';
+import '../services/security_service.dart';
+import '../services/export_service.dart';
+import '../services/ai_service.dart';
+import '../services/sync_service.dart';
+import 'auth_provider.dart';
 
 class VoiceNotesProvider with ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   final AudioService _audioService = AudioService();
   final TranscriptionService _transcriptionService = TranscriptionService();
+  final SecurityService _securityService = SecurityService();
+  final ExportService _exportService = ExportService();
+  final AIService _aiService = AIService();
+  final SyncService _syncService = SyncService();
 
   List<VoiceNote> _voiceNotes = [];
   List<VoiceNote> get voiceNotes => _voiceNotes;
@@ -61,6 +70,7 @@ class VoiceNotesProvider with ChangeNotifier {
     await _audioService.initialize();
     _setupAudioServiceListeners();
     await _transcriptionService.initialize();
+    await _syncService.initialize();
     await loadVoiceNotes();
     await loadAllTags();
   }
@@ -229,12 +239,18 @@ class VoiceNotesProvider with ChangeNotifier {
     required String description,
     required String filePath,
     required List<String> tags,
+    bool encrypt = false,
   }) async {
     try {
       _error = null;
 
       // Get audio duration
       final duration = await _audioService.getAudioDuration(filePath);
+
+      String? transcript = _liveTranscript;
+      if (encrypt && (transcript ?? '').isNotEmpty) {
+        transcript = await _securityService.encryptText(transcript!);
+      }
 
       final voiceNote = VoiceNote(
         title: title,
@@ -244,8 +260,9 @@ class VoiceNotesProvider with ChangeNotifier {
         tags: tags,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        transcript: _liveTranscript,
+        transcript: transcript,
         languageCode: _languageCode,
+        isEncrypted: encrypt,
       );
 
       await _databaseService.insertVoiceNote(voiceNote);
@@ -268,15 +285,21 @@ class VoiceNotesProvider with ChangeNotifier {
     String? transcript,
     bool? isFavorite,
     bool? isPinned,
+    bool? reencryptTranscript,
   }) async {
     try {
       _error = null;
+
+      String? finalTranscript = transcript;
+      if ((reencryptTranscript ?? false) && (finalTranscript ?? '').isNotEmpty) {
+        finalTranscript = await _securityService.encryptText(finalTranscript!);
+      }
 
       final updatedNote = voiceNote.copyWith(
         title: title ?? voiceNote.title,
         description: description ?? voiceNote.description,
         tags: tags ?? voiceNote.tags,
-        transcript: transcript ?? voiceNote.transcript,
+        transcript: finalTranscript ?? voiceNote.transcript,
         isFavorite: isFavorite ?? voiceNote.isFavorite,
         isPinned: isPinned ?? voiceNote.isPinned,
         updatedAt: DateTime.now(),
@@ -288,6 +311,56 @@ class VoiceNotesProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Failed to update voice note: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Export/share helpers
+  Future<void> exportAndShareTxt(VoiceNote note) async {
+    final file = await _exportService.exportAsTxt(note);
+    await _exportService.shareFiles([file], subject: note.title);
+  }
+
+  Future<void> exportAndSharePdf(VoiceNote note) async {
+    final file = await _exportService.exportAsPdf(note);
+    await _exportService.shareFiles([file], subject: note.title);
+  }
+
+  Future<void> shareAudio(VoiceNote note) async {
+    final file = await _exportService.exportAudio(note);
+    await _exportService.shareFiles([file], subject: note.title);
+  }
+
+  // AI summarize
+  Future<bool> generateSummary(VoiceNote note) async {
+    try {
+      final text = note.transcript ?? '';
+      if (text.isEmpty) return false;
+      final summary = await _aiService.summarizeTranscript(text);
+      if (summary == null) return false;
+      final updated = note.copyWith(summary: summary, updatedAt: DateTime.now());
+      await _databaseService.updateVoiceNote(updated);
+      await loadVoiceNotes();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Supabase sync
+  Future<bool> syncNoteWithCloud(VoiceNote note, {String? userId}) async {
+    try {
+      if (userId == null) return false;
+      final audioUrl = await _syncService.uploadAudio(userId, note);
+      final remoteId = await _syncService.upsertNote(userId, note, audioUrl: audioUrl);
+      if (remoteId == null) return false;
+      final updated = note.copyWith(remoteId: remoteId, lastSyncedAt: DateTime.now());
+      await _databaseService.updateVoiceNote(updated);
+      await loadVoiceNotes();
+      return true;
+    } catch (e) {
+      _error = 'Cloud sync failed: $e';
       notifyListeners();
       return false;
     }

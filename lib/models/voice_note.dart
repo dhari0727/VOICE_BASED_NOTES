@@ -11,6 +11,10 @@ class VoiceNote {
   final String? languageCode;
   final bool isFavorite;
   final bool isPinned;
+  final String? summary;
+  final String? remoteId;
+  final DateTime? lastSyncedAt;
+  final bool isEncrypted;
 
   VoiceNote({
     this.id,
@@ -25,6 +29,10 @@ class VoiceNote {
     this.languageCode,
     this.isFavorite = false,
     this.isPinned = false,
+    this.summary,
+    this.remoteId,
+    this.lastSyncedAt,
+    this.isEncrypted = false,
   });
 
   // Convert VoiceNote to Map for database storage
@@ -42,6 +50,10 @@ class VoiceNote {
       'languageCode': languageCode,
       'isFavorite': isFavorite ? 1 : 0,
       'isPinned': isPinned ? 1 : 0,
+      'summary': summary,
+      'remoteId': remoteId,
+      'lastSyncedAt': lastSyncedAt?.millisecondsSinceEpoch,
+      'isEncrypted': isEncrypted ? 1 : 0,
     };
   }
 
@@ -63,6 +75,12 @@ class VoiceNote {
       languageCode: map['languageCode'],
       isFavorite: (map['isFavorite'] ?? 0) == 1,
       isPinned: (map['isPinned'] ?? 0) == 1,
+      summary: map['summary'],
+      remoteId: map['remoteId'],
+      lastSyncedAt: map['lastSyncedAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['lastSyncedAt'])
+          : null,
+      isEncrypted: (map['isEncrypted'] ?? 0) == 1,
     );
   }
 
@@ -80,6 +98,10 @@ class VoiceNote {
     String? languageCode,
     bool? isFavorite,
     bool? isPinned,
+    String? summary,
+    String? remoteId,
+    DateTime? lastSyncedAt,
+    bool? isEncrypted,
   }) {
     return VoiceNote(
       id: id ?? this.id,
@@ -94,6 +116,10 @@ class VoiceNote {
       languageCode: languageCode ?? this.languageCode,
       isFavorite: isFavorite ?? this.isFavorite,
       isPinned: isPinned ?? this.isPinned,
+      summary: summary ?? this.summary,
+      remoteId: remoteId ?? this.remoteId,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      isEncrypted: isEncrypted ?? this.isEncrypted,
     );
   }
 
@@ -133,6 +159,10 @@ class VoiceNote {
       languageCode,
       isFavorite,
       isPinned,
+      summary,
+      remoteId,
+      lastSyncedAt,
+      isEncrypted,
     );
   }
 
