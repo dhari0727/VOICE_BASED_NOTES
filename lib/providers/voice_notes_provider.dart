@@ -3,11 +3,13 @@ import '../models/voice_note.dart';
 import '../services/database_service.dart';
 import '../services/audio_service.dart';
 import '../services/transcription_service.dart';
+import '../services/notification_service.dart';
 
 class VoiceNotesProvider with ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   final AudioService _audioService = AudioService();
   final TranscriptionService _transcriptionService = TranscriptionService();
+  final NotificationService _notificationService = NotificationService();
 
   List<VoiceNote> _voiceNotes = [];
   List<VoiceNote> get voiceNotes => _voiceNotes;
@@ -20,6 +22,12 @@ class VoiceNotesProvider with ChangeNotifier {
 
   String? _selectedTag;
   String? get selectedTag => _selectedTag;
+
+  int? _selectedPriority; // null = all
+  int? get selectedPriority => _selectedPriority;
+
+  String _sortKey = 'updated_desc';
+  String get sortKey => _sortKey; // 'updated_desc' | 'created_asc' | 'priority_desc'
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -112,12 +120,16 @@ class VoiceNotesProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      final orderBy = _orderByClause();
+
       if (_searchQuery.isNotEmpty) {
         _voiceNotes = await _databaseService.searchVoiceNotes(_searchQuery);
       } else if (_selectedTag != null) {
         _voiceNotes = await _databaseService.getVoiceNotesByTag(_selectedTag!);
+      } else if (_selectedPriority != null) {
+        _voiceNotes = await _databaseService.getVoiceNotesByPriority(_selectedPriority!, orderBy: orderBy);
       } else {
-        _voiceNotes = await _databaseService.getAllVoiceNotes();
+        _voiceNotes = await _databaseService.getAllVoiceNotes(orderBy: orderBy);
       }
     } catch (e) {
       _error = 'Failed to load voice notes: $e';
@@ -152,7 +164,30 @@ class VoiceNotesProvider with ChangeNotifier {
   void clearFilters() {
     _searchQuery = '';
     _selectedTag = null;
+    _selectedPriority = null;
     loadVoiceNotes();
+  }
+
+  void setPriorityFilter(int? priority) {
+    _selectedPriority = priority;
+    loadVoiceNotes();
+  }
+
+  void setSortKey(String key) {
+    _sortKey = key;
+    loadVoiceNotes();
+  }
+
+  String _orderByClause() {
+    switch (_sortKey) {
+      case 'created_asc':
+        return 'createdAt ASC';
+      case 'priority_desc':
+        return 'priority DESC, updatedAt DESC';
+      case 'updated_desc':
+      default:
+        return 'updatedAt DESC';
+    }
   }
 
   // Recording methods
@@ -247,6 +282,9 @@ class VoiceNotesProvider with ChangeNotifier {
     required String filePath,
     required List<String> tags,
     String? transcript,
+    int priority = 1,
+    List<String> attachments = const [],
+    DateTime? reminderAt,
   }) async {
     try {
       _error = null;
@@ -266,9 +304,27 @@ class VoiceNotesProvider with ChangeNotifier {
             ? transcript.trim()
             : _liveTranscript,
         languageCode: _languageCode,
+        priority: priority,
+        attachments: attachments,
+        reminderAt: reminderAt,
       );
 
       await _databaseService.insertVoiceNote(voiceNote);
+      // If a reminder is set, schedule it using a temporary ID based on timestamp is not ideal.
+      // After insert, reload to fetch the DB id and then schedule. For simplicity, attempt quick reload.
+      await loadVoiceNotes();
+      try {
+        final inserted = _voiceNotes.firstWhere((n) =>
+            n.filePath == voiceNote.filePath && n.createdAt.millisecondsSinceEpoch == voiceNote.createdAt.millisecondsSinceEpoch);
+        if (voiceNote.reminderAt != null && inserted.id != null) {
+          await _notificationService.scheduleNoteReminder(
+            noteId: inserted.id!,
+            title: voiceNote.title.isNotEmpty ? voiceNote.title : 'Voice Note Reminder',
+            body: voiceNote.description.isNotEmpty ? voiceNote.description : (voiceNote.transcript ?? ''),
+            when: voiceNote.reminderAt!,
+          );
+        }
+      } catch (_) {}
       _liveTranscript = null;
       await loadVoiceNotes();
       await loadAllTags();
@@ -303,6 +359,18 @@ class VoiceNotesProvider with ChangeNotifier {
       );
 
       await _databaseService.updateVoiceNote(updatedNote);
+      if (voiceNote.id != null) {
+        // cancel any existing reminder first
+        await _notificationService.cancelReminder(voiceNote.id!);
+        if (updatedNote.reminderAt != null) {
+          await _notificationService.scheduleNoteReminder(
+            noteId: voiceNote.id!,
+            title: updatedNote.title,
+            body: updatedNote.description.isNotEmpty ? updatedNote.description : (updatedNote.transcript ?? ''),
+            when: updatedNote.reminderAt!,
+          );
+        }
+      }
       await loadVoiceNotes();
       await loadAllTags();
       return true;

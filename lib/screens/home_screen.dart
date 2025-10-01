@@ -11,6 +11,8 @@ import '../services/audio_service.dart';
 import 'add_edit_note_screen.dart';
 import '../providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
+import '../services/realtime_share_service.dart';
+import 'export_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -158,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     provider.clearFilters();
                   },
                 ),
+                _buildPriorityAndSortBar(context),
                 if (provider.error != null)
                   Container(
                     margin: const EdgeInsets.all(16),
@@ -281,6 +284,49 @@ class _HomeScreenState extends State<HomeScreen> {
                                                       voiceNote: note,
                                                       isPinned: !note.isPinned,
                                                     ),
+                                                onShareRealtime: () async {
+                                                  try {
+                                                    await RealtimeShareService().shareNoteRealtime(note);
+                                                    if (context.mounted) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(content: Text('Shared successfully')),
+                                                      );
+                                                    }
+                                                  } catch (e) {
+                                                    if (context.mounted) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        SnackBar(content: Text('Share failed: $e')),
+                                                      );
+                                                    }
+                                                  }
+                                                },
+                                                onShareFallback: () async {
+                                                  try {
+                                                    await RealtimeShareService().shareNoteFallback(note);
+                                                  } catch (e) {
+                                                    if (context.mounted) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        SnackBar(content: Text('Share failed: $e')),
+                                                      );
+                                                    }
+                                                  }
+                                                },
+                                                onEdit: () async {
+                                                  if (!protected) {
+                                                    _navigateToEditNote(
+                                                      context,
+                                                      note,
+                                                    );
+                                                    return;
+                                                  }
+                                                  final ok = await _promptForPin();
+                                                  if (ok) {
+                                                    _navigateToEditNote(
+                                                      context,
+                                                      note,
+                                                    );
+                                                  }
+                                                },
                                               ),
                                               // lock badge
                                               if (protected)
@@ -326,6 +372,54 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       floatingActionButton: const RecordingFAB(),
+    );
+  }
+
+  Widget _buildPriorityAndSortBar(BuildContext context) {
+    return Consumer<VoiceNotesProvider>(
+      builder: (context, provider, _) {
+        Widget chip(String label, int? value, Color color) {
+          final bool selected = provider.selectedPriority == value;
+          return ChoiceChip(
+            label: Text(label),
+            selected: selected,
+            selectedColor: color.withOpacity(0.15),
+            labelStyle: TextStyle(
+              color: selected ? color : Colors.black87,
+              fontWeight: FontWeight.w600,
+            ),
+            onSelected: (_) => provider.setPriorityFilter(value),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    chip('All', null, Colors.blueGrey),
+                    chip('High', 2, Colors.red),
+                    chip('Med', 1, Colors.orange),
+                    chip('Low', 0, Colors.green),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.sort),
+                onSelected: provider.setSortKey,
+                itemBuilder: (ctx) => const [
+                  PopupMenuItem(value: 'updated_desc', child: Text('Newest updated')),
+                  PopupMenuItem(value: 'created_asc', child: Text('Oldest created')),
+                  PopupMenuItem(value: 'priority_desc', child: Text('Priority first')),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/voice_note.dart';
+import 'dart:io';
+import 'package:open_filex/open_filex.dart';
+import '../screens/attachment_viewer_screen.dart';
 
 class VoiceNoteCard extends StatelessWidget {
   final VoiceNote voiceNote;
@@ -13,6 +16,8 @@ class VoiceNoteCard extends StatelessWidget {
   final Function(Duration) onSeek;
   final VoidCallback? onToggleFavorite;
   final VoidCallback? onTogglePinned;
+  final VoidCallback? onShareRealtime;
+  final VoidCallback? onShareFallback;
 
   const VoiceNoteCard({
     super.key,
@@ -26,6 +31,8 @@ class VoiceNoteCard extends StatelessWidget {
     required this.onSeek,
     this.onToggleFavorite,
     this.onTogglePinned,
+    this.onShareRealtime,
+    this.onShareFallback,
   });
 
   @override
@@ -62,6 +69,10 @@ class VoiceNoteCard extends StatelessWidget {
               const SizedBox(height: 12),
               _buildTags(context),
             ],
+            if (voiceNote.attachments.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _buildAttachments(context),
+            ],
             const SizedBox(height: 12),
             _buildFooter(context),
           ],
@@ -73,6 +84,15 @@ class VoiceNoteCard extends StatelessWidget {
   Widget _buildHeader(BuildContext context) {
     return Row(
       children: [
+        Container(
+          width: 8,
+          height: 28,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: _priorityColor(voiceNote.priority),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
         Expanded(
           child: Text(
             voiceNote.title,
@@ -112,6 +132,15 @@ class VoiceNoteCard extends StatelessWidget {
               case 'delete':
                 onDelete();
                 break;
+              case 'export':
+                // handled by parent via onEdit hook or separate action if needed
+                break;
+              case 'share_rt':
+                if (onShareRealtime != null) onShareRealtime!();
+                break;
+              case 'share':
+                if (onShareFallback != null) onShareFallback!();
+                break;
             }
           },
           itemBuilder:
@@ -136,11 +165,53 @@ class VoiceNoteCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                const PopupMenuItem<String>(
+                  value: 'export',
+                  child: Row(
+                    children: [
+                      Icon(Icons.picture_as_pdf, size: 16),
+                      SizedBox(width: 8),
+                      Text('Export'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'share_rt',
+                  child: Row(
+                    children: [
+                      Icon(Icons.wifi_tethering, size: 16),
+                      SizedBox(width: 8),
+                      Text('Share (Realtime)'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'share',
+                  child: Row(
+                    children: [
+                      Icon(Icons.share, size: 16),
+                      SizedBox(width: 8),
+                      Text('Share'),
+                    ],
+                  ),
+                ),
               ],
           child: Icon(Icons.more_vert, color: Colors.grey[600]),
         ),
       ],
     );
+  }
+
+  Color _priorityColor(int p) {
+    switch (p) {
+      case 2:
+        return Colors.red;
+      case 0:
+        return Colors.green;
+      case 1:
+      default:
+        return Colors.orange;
+    }
   }
 
   Widget _buildAudioControls(BuildContext context) {
@@ -318,6 +389,78 @@ class VoiceNoteCard extends StatelessWidget {
         ),
       ],
     ),
+      ],
+    );
+  }
+
+  Widget _buildAttachments(BuildContext context) {
+    List<Widget> tiles = [];
+    for (final path in voiceNote.attachments.take(6)) {
+      final lower = path.toLowerCase();
+      final isImage = lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.webp');
+      final isVideo = lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.mkv') || lower.endsWith('.webm');
+      final isAudio = lower.endsWith('.mp3') || lower.endsWith('.aac') || lower.endsWith('.wav') || lower.endsWith('.m4a');
+
+      Widget content;
+      if (isImage && File(path).existsSync()) {
+        content = ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.file(
+            File(path),
+            fit: BoxFit.cover,
+          ),
+        );
+      } else {
+        IconData icon = Icons.insert_drive_file;
+        if (isVideo) icon = Icons.videocam;
+        if (isAudio) icon = Icons.audiotrack;
+        content = Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Icon(icon, color: Colors.grey[700]),
+          ),
+        );
+      }
+
+      tiles.add(GestureDetector(
+        onTap: () {
+          if (isImage) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AttachmentViewerScreen(imagePaths: voiceNote.attachments.where((p){final l=p.toLowerCase();return l.endsWith('.png')||l.endsWith('.jpg')||l.endsWith('.jpeg')||l.endsWith('.webp');}).toList(), initialPath: path),
+              ),
+            );
+          } else {
+            OpenFilex.open(path);
+          }
+        },
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: content,
+        ),
+      ));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Attachments',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        GridView.count(
+          crossAxisCount: 3,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: tiles,
+        ),
       ],
     );
   }

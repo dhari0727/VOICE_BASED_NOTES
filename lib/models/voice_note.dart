@@ -11,6 +11,9 @@ class VoiceNote {
   final String? languageCode;
   final bool isFavorite;
   final bool isPinned;
+  final int priority; // 0=Low, 1=Medium, 2=High
+  final List<String> attachments; // file paths (image/video/pdf/audio)
+  final DateTime? reminderAt;
 
   VoiceNote({
     this.id,
@@ -25,6 +28,9 @@ class VoiceNote {
     this.languageCode,
     this.isFavorite = false,
     this.isPinned = false,
+    this.priority = 1,
+    this.attachments = const [],
+    this.reminderAt,
   });
 
   // Convert VoiceNote to Map for database storage
@@ -42,6 +48,9 @@ class VoiceNote {
       'languageCode': languageCode,
       'isFavorite': isFavorite ? 1 : 0,
       'isPinned': isPinned ? 1 : 0,
+      'priority': priority,
+      'attachments': attachments.join('|'),
+      'reminderAt': reminderAt?.millisecondsSinceEpoch,
     };
   }
 
@@ -63,6 +72,9 @@ class VoiceNote {
       languageCode: map['languageCode'],
       isFavorite: (map['isFavorite'] ?? 0) == 1,
       isPinned: (map['isPinned'] ?? 0) == 1,
+      priority: (map['priority'] ?? 1),
+      attachments: (map['attachments'] as String?)?.split('|').where((e) => e.isNotEmpty).toList() ?? <String>[],
+      reminderAt: map['reminderAt'] != null ? DateTime.fromMillisecondsSinceEpoch(map['reminderAt']) : null,
     );
   }
 
@@ -80,6 +92,9 @@ class VoiceNote {
     String? languageCode,
     bool? isFavorite,
     bool? isPinned,
+    int? priority,
+    List<String>? attachments,
+    DateTime? reminderAt,
   }) {
     return VoiceNote(
       id: id ?? this.id,
@@ -94,6 +109,9 @@ class VoiceNote {
       languageCode: languageCode ?? this.languageCode,
       isFavorite: isFavorite ?? this.isFavorite,
       isPinned: isPinned ?? this.isPinned,
+      priority: priority ?? this.priority,
+      attachments: attachments ?? this.attachments,
+      reminderAt: reminderAt ?? this.reminderAt,
     );
   }
 

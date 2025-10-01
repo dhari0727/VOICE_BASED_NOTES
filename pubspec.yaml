@@ -48,6 +48,11 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.4
   share_plus: ^10.0.2
+  file_picker: ^8.1.2
+  image_picker: ^1.1.2
+  open_filex: ^4.5.0
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
 
   # Security
   local_auth: ^2.3.0

@@ -26,7 +26,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -46,7 +46,10 @@ class DatabaseService {
         transcript TEXT,
         languageCode TEXT,
         isFavorite INTEGER DEFAULT 0,
-        isPinned INTEGER DEFAULT 0
+        isPinned INTEGER DEFAULT 0,
+        priority INTEGER DEFAULT 1,
+        attachments TEXT,
+        reminderAt INTEGER
       )
     ''');
 
@@ -62,6 +65,11 @@ class DatabaseService {
       await _safeAddColumn(db, 'voice_notes', 'isFavorite', 'INTEGER DEFAULT 0');
       await _safeAddColumn(db, 'voice_notes', 'isPinned', 'INTEGER DEFAULT 0');
       await _createFtsObjects(db);
+    }
+    if (oldVersion < 3) {
+      await _safeAddColumn(db, 'voice_notes', 'priority', 'INTEGER DEFAULT 1');
+      await _safeAddColumn(db, 'voice_notes', 'attachments', 'TEXT');
+      await _safeAddColumn(db, 'voice_notes', 'reminderAt', 'INTEGER');
     }
   }
 
@@ -120,11 +128,25 @@ class DatabaseService {
   }
 
   // Get all voice notes
-  Future<List<VoiceNote>> getAllVoiceNotes() async {
+  Future<List<VoiceNote>> getAllVoiceNotes({String orderBy = 'updatedAt DESC'}) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'voice_notes',
-      orderBy: 'updatedAt DESC',
+      orderBy: orderBy,
+    );
+
+    return List.generate(maps.length, (i) {
+      return VoiceNote.fromMap(maps[i]);
+    });
+  }
+
+  Future<List<VoiceNote>> getVoiceNotesByPriority(int priority, {String orderBy = 'updatedAt DESC'}) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'voice_notes',
+      where: 'priority = ?',
+      whereArgs: [priority],
+      orderBy: orderBy,
     );
 
     return List.generate(maps.length, (i) {
