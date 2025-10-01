@@ -94,7 +94,15 @@ class _RecordingFABState extends State<RecordingFAB>
       // Stop recording and fetch final transcript
       final result = await provider.stopRecordingAndGetTranscript();
       if (result != null && result['path'] != null) {
-        _navigateToAddNote(context, result['path']!, initialTranscript: result['transcript']);
+        final initialTranscript =
+            (result['transcript'] != null && result['transcript']!.trim().isNotEmpty)
+                ? result['transcript']
+                : provider.liveTranscript;
+        _navigateToAddNote(
+          context,
+          result['path']!,
+          initialTranscript: initialTranscript,
+        );
       } else if (provider.error != null) {
         _showErrorSnackBar(context, provider.error!);
       }

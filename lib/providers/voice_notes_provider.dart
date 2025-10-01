@@ -94,6 +94,16 @@ class VoiceNotesProvider with ChangeNotifier {
       _playbackDuration = duration;
       notifyListeners();
     };
+
+    // Wire live transcription from AudioService
+    _audioService.onTranscriptPartial = (String partial) {
+      _liveTranscript = partial;
+      notifyListeners();
+    };
+    _audioService.onTranscriptFinal = (String finalText) {
+      _liveTranscript = finalText;
+      notifyListeners();
+    };
   }
 
   Future<void> loadVoiceNotes() async {
@@ -150,15 +160,8 @@ class VoiceNotesProvider with ChangeNotifier {
     try {
       _error = null;
       final path = await _audioService.startRecording();
-      // Start live transcription optionally
+      // Reset live transcript; AudioService will emit partials/finals
       _liveTranscript = null;
-      _transcriptionService.startListening(
-        localeId: _languageCode,
-        onPartial: (text) {
-          _liveTranscript = text;
-          notifyListeners();
-        },
-      );
       return path;
     } catch (e) {
       _error = 'Failed to start recording: $e';
@@ -171,9 +174,7 @@ class VoiceNotesProvider with ChangeNotifier {
     try {
       _error = null;
       final filePath = await _audioService.stopRecording();
-      // stop live transcription and hold text for next save
-      final finalText = await _transcriptionService.stopListening();
-      _liveTranscript = finalText ?? _liveTranscript;
+      // stop live transcription and hold text for next save (AudioService has it)
       return filePath;
     } catch (e) {
       _error = 'Failed to stop recording: $e';
