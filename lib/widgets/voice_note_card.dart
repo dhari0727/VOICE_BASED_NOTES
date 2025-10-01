@@ -11,6 +11,8 @@ class VoiceNoteCard extends StatelessWidget {
   final Duration playbackPosition;
   final Duration playbackDuration;
   final Function(Duration) onSeek;
+  final VoidCallback? onToggleFavorite;
+  final VoidCallback? onTogglePinned;
 
   const VoiceNoteCard({
     super.key,
@@ -22,6 +24,8 @@ class VoiceNoteCard extends StatelessWidget {
     required this.playbackPosition,
     required this.playbackDuration,
     required this.onSeek,
+    this.onToggleFavorite,
+    this.onTogglePinned,
   });
 
   @override
@@ -79,6 +83,26 @@ class VoiceNoteCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
+        if (onTogglePinned != null)
+          IconButton(
+            tooltip: 'Pin',
+            onPressed: onTogglePinned,
+            icon: Icon(
+              voiceNote.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+              size: 18,
+              color: voiceNote.isPinned ? Theme.of(context).primaryColor : Colors.grey[600],
+            ),
+          ),
+        if (onToggleFavorite != null)
+          IconButton(
+            tooltip: 'Favorite',
+            onPressed: onToggleFavorite,
+            icon: Icon(
+              voiceNote.isFavorite ? Icons.favorite : Icons.favorite_border,
+              size: 18,
+              color: voiceNote.isFavorite ? const Color(0xFFE17055) : Colors.grey[600],
+            ),
+          ),
         PopupMenuButton<String>(
           onSelected: (value) {
             switch (value) {
@@ -149,6 +173,8 @@ class VoiceNoteCard extends StatelessWidget {
                 ),
               ),
               Expanded(child: _buildProgressSlider(context)),
+              const SizedBox(width: 8),
+              _buildSpeedMenu(context),
               Text(
                 isPlaying
                     ? '${_formatDuration(playbackPosition)} / ${_formatDuration(playbackDuration)}'
@@ -163,6 +189,23 @@ class VoiceNoteCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSpeedMenu(BuildContext context) {
+    return PopupMenuButton<double>(
+      tooltip: 'Speed',
+      onSelected: (value) {
+        // The parent should handle speed changes via provider; this is UI-only placeholder
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(value: 0.75, child: Text('0.75x')),
+        PopupMenuItem(value: 1.0, child: Text('1.0x')),
+        PopupMenuItem(value: 1.25, child: Text('1.25x')),
+        PopupMenuItem(value: 1.5, child: Text('1.5x')),
+        PopupMenuItem(value: 2.0, child: Text('2.0x')),
+      ],
+      child: Icon(Icons.speed, size: 18, color: Colors.grey[600]),
     );
   }
 
@@ -237,7 +280,24 @@ class VoiceNoteCard extends StatelessWidget {
     ).format(voiceNote.updatedAt);
     final isUpdated = voiceNote.createdAt != voiceNote.updatedAt;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if ((voiceNote.transcript ?? '').isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              (voiceNote.transcript!).length > 160
+                  ? voiceNote.transcript!.substring(0, 160) + '…'
+                  : voiceNote.transcript!,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[700],
+                  ),
+            ),
+          ),
+        Row(
       children: [
         Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
         const SizedBox(width: 4),
@@ -256,6 +316,8 @@ class VoiceNoteCard extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
+      ],
+    ),
       ],
     );
   }

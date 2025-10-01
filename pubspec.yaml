@@ -53,6 +53,32 @@ dependencies:
   
   # UI Components
   flutter_staggered_animations: ^1.1.1
+  
+  # Routing
+  go_router: ^14.2.0
+
+  # Supabase (auth, db, storage)
+  supabase_flutter: ^2.6.0
+
+  # Transcription (on-device speech recognition)
+  speech_to_text: ^6.6.2
+
+  # Full-text search (bundled SQLite with FTS)
+  sqlite3_flutter_libs: ^0.5.24
+
+  # Export & sharing
+  pdf: ^3.11.1
+  printing: ^5.13.4
+  share_plus: ^10.0.2
+
+  # Security
+  local_auth: ^2.3.0
+  flutter_secure_storage: ^9.2.2
+  encrypt: ^5.0.3
+
+  # HTTP/LLM for summaries (optional)
+  http: ^1.2.2
+  dart_openai: ^5.1.0
 
 dev_dependencies:
   flutter_test:

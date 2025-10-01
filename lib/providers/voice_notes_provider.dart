@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/voice_note.dart';
 import '../services/database_service.dart';
 import '../services/audio_service.dart';
+import '../services/transcription_service.dart';
 
 class VoiceNotesProvider with ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   final AudioService _audioService = AudioService();
+  final TranscriptionService _transcriptionService = TranscriptionService();
 
   List<VoiceNote> _voiceNotes = [];
   List<VoiceNote> get voiceNotes => _voiceNotes;
@@ -32,6 +34,12 @@ class VoiceNotesProvider with ChangeNotifier {
   Duration _recordingDuration = Duration.zero;
   Duration get recordingDuration => _recordingDuration;
 
+  // Live transcription state
+  String? _liveTranscript;
+  String? get liveTranscript => _liveTranscript;
+  String _languageCode = 'en_US';
+  String get languageCode => _languageCode;
+
   // Current playback state
   String? _currentlyPlayingId;
   String? get currentlyPlayingId => _currentlyPlayingId;
@@ -52,6 +60,7 @@ class VoiceNotesProvider with ChangeNotifier {
   Future<void> _initialize() async {
     await _audioService.initialize();
     _setupAudioServiceListeners();
+    await _transcriptionService.initialize();
     await loadVoiceNotes();
     await loadAllTags();
   }
@@ -140,7 +149,17 @@ class VoiceNotesProvider with ChangeNotifier {
   Future<String?> startRecording() async {
     try {
       _error = null;
-      return await _audioService.startRecording();
+      final path = await _audioService.startRecording();
+      // Start live transcription optionally
+      _liveTranscript = null;
+      _transcriptionService.startListening(
+        localeId: _languageCode,
+        onPartial: (text) {
+          _liveTranscript = text;
+          notifyListeners();
+        },
+      );
+      return path;
     } catch (e) {
       _error = 'Failed to start recording: $e';
       notifyListeners();
@@ -151,7 +170,11 @@ class VoiceNotesProvider with ChangeNotifier {
   Future<String?> stopRecording() async {
     try {
       _error = null;
-      return await _audioService.stopRecording();
+      final filePath = await _audioService.stopRecording();
+      // stop live transcription and hold text for next save
+      final finalText = await _transcriptionService.stopListening();
+      _liveTranscript = finalText ?? _liveTranscript;
+      return filePath;
     } catch (e) {
       _error = 'Failed to stop recording: $e';
       notifyListeners();
@@ -221,9 +244,12 @@ class VoiceNotesProvider with ChangeNotifier {
         tags: tags,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        transcript: _liveTranscript,
+        languageCode: _languageCode,
       );
 
       await _databaseService.insertVoiceNote(voiceNote);
+      _liveTranscript = null;
       await loadVoiceNotes();
       await loadAllTags();
       return true;
@@ -239,6 +265,9 @@ class VoiceNotesProvider with ChangeNotifier {
     String? title,
     String? description,
     List<String>? tags,
+    String? transcript,
+    bool? isFavorite,
+    bool? isPinned,
   }) async {
     try {
       _error = null;
@@ -247,6 +276,9 @@ class VoiceNotesProvider with ChangeNotifier {
         title: title ?? voiceNote.title,
         description: description ?? voiceNote.description,
         tags: tags ?? voiceNote.tags,
+        transcript: transcript ?? voiceNote.transcript,
+        isFavorite: isFavorite ?? voiceNote.isFavorite,
+        isPinned: isPinned ?? voiceNote.isPinned,
         updatedAt: DateTime.now(),
       );
 

@@ -7,6 +7,10 @@ class VoiceNote {
   final List<String> tags;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? transcript;
+  final String? languageCode;
+  final bool isFavorite;
+  final bool isPinned;
 
   VoiceNote({
     this.id,
@@ -17,6 +21,10 @@ class VoiceNote {
     required this.tags,
     required this.createdAt,
     required this.updatedAt,
+    this.transcript,
+    this.languageCode,
+    this.isFavorite = false,
+    this.isPinned = false,
   });
 
   // Convert VoiceNote to Map for database storage
@@ -30,6 +38,10 @@ class VoiceNote {
       'tags': tags.join(','),
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
+      'transcript': transcript,
+      'languageCode': languageCode,
+      'isFavorite': isFavorite ? 1 : 0,
+      'isPinned': isPinned ? 1 : 0,
     };
   }
 
@@ -47,6 +59,10 @@ class VoiceNote {
               : <String>[],
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] ?? 0),
+      transcript: map['transcript'],
+      languageCode: map['languageCode'],
+      isFavorite: (map['isFavorite'] ?? 0) == 1,
+      isPinned: (map['isPinned'] ?? 0) == 1,
     );
   }
 
@@ -60,6 +76,10 @@ class VoiceNote {
     List<String>? tags,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? transcript,
+    String? languageCode,
+    bool? isFavorite,
+    bool? isPinned,
   }) {
     return VoiceNote(
       id: id ?? this.id,
@@ -70,6 +90,10 @@ class VoiceNote {
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      transcript: transcript ?? this.transcript,
+      languageCode: languageCode ?? this.languageCode,
+      isFavorite: isFavorite ?? this.isFavorite,
+      isPinned: isPinned ?? this.isPinned,
     );
   }
 
@@ -105,6 +129,10 @@ class VoiceNote {
       tags,
       createdAt,
       updatedAt,
+      transcript,
+      languageCode,
+      isFavorite,
+      isPinned,
     );
   }
 

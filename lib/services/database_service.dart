@@ -24,7 +24,12 @@ class DatabaseService {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'voicenotes.db');
 
-    return await openDatabase(path, version: 1, onCreate: _createDatabase);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDatabase,
+      onUpgrade: _upgradeDatabase,
+    );
   }
 
   Future<void> _createDatabase(Database db, int version) async {
@@ -37,9 +42,75 @@ class DatabaseService {
         duration INTEGER NOT NULL,
         tags TEXT,
         createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL
+        updatedAt INTEGER NOT NULL,
+        transcript TEXT,
+        languageCode TEXT,
+        isFavorite INTEGER DEFAULT 0,
+        isPinned INTEGER DEFAULT 0
       )
     ''');
+
+    // Create optional FTS5 table for transcript search if supported
+    await _createFtsObjects(db);
+  }
+
+  Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add new columns if they do not already exist
+      await _safeAddColumn(db, 'voice_notes', 'transcript', 'TEXT');
+      await _safeAddColumn(db, 'voice_notes', 'languageCode', 'TEXT');
+      await _safeAddColumn(db, 'voice_notes', 'isFavorite', 'INTEGER DEFAULT 0');
+      await _safeAddColumn(db, 'voice_notes', 'isPinned', 'INTEGER DEFAULT 0');
+      await _createFtsObjects(db);
+    }
+  }
+
+  Future<void> _safeAddColumn(Database db, String table, String column, String type) async {
+    final List<Map<String, Object?>> columns = await db.rawQuery('PRAGMA table_info($table)');
+    final exists = columns.any((c) => (c['name'] as String?) == column);
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+    }
+  }
+
+  Future<void> _createFtsObjects(Database db) async {
+    // Create a contentless FTS5 table for transcript text, synchronized via triggers
+    try {
+      await db.execute('''
+        CREATE VIRTUAL TABLE IF NOT EXISTS voice_notes_fts USING fts5(
+          note_id UNINDEXED,
+          transcript,
+          content=''
+        )
+      ''');
+
+      // Seed existing data
+      await db.execute('''
+        INSERT INTO voice_notes_fts(note_id, transcript)
+        SELECT id, COALESCE(transcript, '') FROM voice_notes
+      ''');
+
+      // Triggers to keep FTS in sync
+      await db.execute('''
+        CREATE TRIGGER IF NOT EXISTS voice_notes_ai AFTER INSERT ON voice_notes BEGIN
+          INSERT INTO voice_notes_fts(note_id, transcript) VALUES (NEW.id, COALESCE(NEW.transcript, ''));
+        END;
+      ''');
+
+      await db.execute('''
+        CREATE TRIGGER IF NOT EXISTS voice_notes_au AFTER UPDATE ON voice_notes BEGIN
+          UPDATE voice_notes_fts SET transcript = COALESCE(NEW.transcript, '') WHERE note_id = NEW.id;
+        END;
+      ''');
+
+      await db.execute('''
+        CREATE TRIGGER IF NOT EXISTS voice_notes_ad AFTER DELETE ON voice_notes BEGIN
+          DELETE FROM voice_notes_fts WHERE note_id = OLD.id;
+        END;
+      ''');
+    } catch (_) {
+      // If FTS5 is unavailable on the platform, ignore and fall back to LIKE queries
+    }
   }
 
   // Create a new voice note
@@ -93,19 +164,34 @@ class DatabaseService {
     return await db.delete('voice_notes', where: 'id = ?', whereArgs: [id]);
   }
 
-  // Search voice notes by title or tags
+  // Search voice notes by title, tags, or transcript (FTS if available)
   Future<List<VoiceNote>> searchVoiceNotes(String query) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
+
+    // Try FTS first
+    try {
+      final List<Map<String, dynamic>> maps = await db.rawQuery('''
+        SELECT vn.* FROM voice_notes vn
+        LEFT JOIN voice_notes_fts fts ON fts.note_id = vn.id
+        WHERE vn.title LIKE ? OR vn.tags LIKE ? OR (fts.transcript MATCH ?)
+        ORDER BY vn.updatedAt DESC
+      ''', ['%$query%', '%$query%', query]);
+
+      if (maps.isNotEmpty) {
+        return List.generate(maps.length, (i) => VoiceNote.fromMap(maps[i]));
+      }
+    } catch (_) {
+      // Fallback to LIKE on transcript if FTS is not available
+    }
+
+    final List<Map<String, dynamic>> fallbackMaps = await db.query(
       'voice_notes',
-      where: 'title LIKE ? OR tags LIKE ?',
-      whereArgs: ['%$query%', '%$query%'],
+      where: 'title LIKE ? OR tags LIKE ? OR transcript LIKE ?',
+      whereArgs: ['%$query%', '%$query%', '%$query%'],
       orderBy: 'updatedAt DESC',
     );
 
-    return List.generate(maps.length, (i) {
-      return VoiceNote.fromMap(maps[i]);
-    });
+    return List.generate(fallbackMaps.length, (i) => VoiceNote.fromMap(fallbackMaps[i]));
   }
 
   // Get voice notes by tag

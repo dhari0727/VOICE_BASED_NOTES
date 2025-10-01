@@ -20,6 +20,7 @@ class AddEditNoteScreen extends StatefulWidget {
 class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
+  late TextEditingController _transcriptController;
   late TextEditingController _tagController;
   final FocusNode _titleFocus = FocusNode();
   final FocusNode _descriptionFocus = FocusNode();
@@ -45,10 +46,14 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
       _descriptionController = TextEditingController(
         text: widget.voiceNote!.description,
       );
+      _transcriptController = TextEditingController(
+        text: widget.voiceNote!.transcript ?? '',
+      );
       _tags = List.from(widget.voiceNote!.tags);
     } else {
       _titleController = TextEditingController();
       _descriptionController = TextEditingController();
+      _transcriptController = TextEditingController();
       _tags = [];
     }
     _tagController = TextEditingController();
@@ -58,6 +63,7 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _transcriptController.dispose();
     _tagController.dispose();
     _titleFocus.dispose();
     _descriptionFocus.dispose();
@@ -98,6 +104,8 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
             _buildDescriptionField(),
             const SizedBox(height: 16),
             _buildTagsSection(),
+          const SizedBox(height: 16),
+          _buildTranscriptEditor(),
             if (_error != null) ...[
               const SizedBox(height: 16),
               _buildErrorCard(),
@@ -299,6 +307,35 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
     );
   }
 
+  Widget _buildTranscriptEditor() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Transcript',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _transcriptController,
+          decoration: InputDecoration(
+            hintText: 'Auto-generated or enter manually...',
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.all(16),
+          ),
+          maxLines: 8,
+        ),
+      ],
+    );
+  }
+
   Widget _buildTagInput() {
     return TextFormField(
       controller: _tagController,
@@ -423,6 +460,7 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         tags: _tags,
+        transcript: _transcriptController.text.trim(),
       );
     } else {
       success = await provider.saveVoiceNote(
@@ -431,6 +469,10 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
         filePath: audioFilePath,
         tags: _tags,
       );
+      // If there was a live transcript, persist edits if any
+      if (success && _transcriptController.text.trim().isNotEmpty) {
+        // reload to get the newly created note id and allow later edits; UI already refreshes
+      }
     }
 
     setState(() {
