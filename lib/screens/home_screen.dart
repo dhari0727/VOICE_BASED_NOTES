@@ -9,6 +9,8 @@ import '../widgets/recording_fab.dart';
 import '../widgets/simple_header.dart';
 import '../services/audio_service.dart';
 import 'add_edit_note_screen.dart';
+import '../providers/auth_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -120,6 +122,27 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, provider, child) {
             return Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Row(
+                    children: [
+                      const SizedBox.shrink(),
+                      const Spacer(),
+                      Consumer<AuthProvider>(
+                        builder: (context, auth, _) => TextButton.icon(
+                          onPressed: auth.isAuthenticated
+                              ? () async {
+                                  await auth.signOut();
+                                  if (context.mounted) context.go('/login');
+                                }
+                              : () => context.go('/login'),
+                          icon: Icon(auth.isAuthenticated ? Icons.logout : Icons.login),
+                          label: Text(auth.isAuthenticated ? 'Logout' : 'Login'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 SimpleHeader(
                   searchController: _searchController,
                   onSearchChanged: (query) {
@@ -246,6 +269,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     provider.playbackDuration,
                                                 onSeek: (position) => provider
                                                     .seekToPosition(position),
+                                                onToggleFavorite: () => context
+                                                    .read<VoiceNotesProvider>()
+                                                    .updateVoiceNote(
+                                                      voiceNote: note,
+                                                      isFavorite: !note.isFavorite,
+                                                    ),
+                                                onTogglePinned: () => context
+                                                    .read<VoiceNotesProvider>()
+                                                    .updateVoiceNote(
+                                                      voiceNote: note,
+                                                      isPinned: !note.isPinned,
+                                                    ),
                                               ),
                                               // lock badge
                                               if (protected)
