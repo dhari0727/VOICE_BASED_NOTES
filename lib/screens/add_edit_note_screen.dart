@@ -480,20 +480,21 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
     });
 
     if (success) {
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEditing ? 'Note updated!' : 'Note saved!'),
-            backgroundColor: Colors.green[600],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+    if (mounted) {
+      context.pop(); // instead of Navigator.of(context).pop()
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isEditing ? 'Note updated!' : 'Note saved!'),
+          backgroundColor: Colors.green[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
-        );
-      }
-    } else {
+        ),
+      );
+    }
+  }
+ else {
       setState(() {
         _error = provider.error ?? 'Failed to save note';
       });

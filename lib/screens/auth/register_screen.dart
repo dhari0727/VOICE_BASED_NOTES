@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -71,7 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             SnackBar(content: Text(auth.error!)),
                                           );
                                         } else if (context.mounted) {
-                                          Navigator.of(context).pushReplacementNamed('/');
+                                          context.go('/'); // <-- Use GoRouter here
                                         }
                                       },
                                 child: auth.isLoading
@@ -85,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             const SizedBox(height: 8),
                             TextButton(
-                              onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
+                              onPressed: () => context.go('/login'), // <-- GoRouter navigation
                               child: const Text('Already have an account? Login'),
                             ),
                           ],
@@ -102,4 +103,3 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
-

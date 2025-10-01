@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -66,7 +67,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                           email: _email.text.trim(),
                                           password: _password.text.trim(),
                                         );
-                                        if (!ok && auth.error != null && context.mounted) {
+                                        if (ok && context.mounted) {
+                                          context.go('/'); // <-- GoRouter navigation
+                                        } else if (!ok && auth.error != null && context.mounted) {
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             SnackBar(content: Text(auth.error!)),
                                           );
@@ -83,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 8),
                             TextButton(
-                              onPressed: () => Navigator.of(context).pushReplacementNamed('/register'),
+                              onPressed: () => context.go('/register'), // <-- GoRouter navigation
                               child: const Text('Create an account'),
                             ),
                           ],
@@ -100,4 +103,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
