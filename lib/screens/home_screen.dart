@@ -311,22 +311,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     }
                                                   }
                                                 },
-                                                onEdit: () async {
-                                                  if (!protected) {
-                                                    _navigateToEditNote(
-                                                      context,
-                                                      note,
-                                                    );
-                                                    return;
-                                                  }
-                                                  final ok = await _promptForPin();
-                                                  if (ok) {
-                                                    _navigateToEditNote(
-                                                      context,
-                                                      note,
-                                                    );
-                                                  }
-                                                },
                                               ),
                                               // lock badge
                                               if (protected)
