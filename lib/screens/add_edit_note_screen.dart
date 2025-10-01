@@ -8,8 +8,9 @@ import '../../providers/auth_provider.dart';
 class AddEditNoteScreen extends StatefulWidget {
   final VoiceNote? voiceNote;
   final String? audioFilePath;
+  final String? initialTranscript;
 
-  const AddEditNoteScreen({super.key, this.voiceNote, this.audioFilePath})
+  const AddEditNoteScreen({super.key, this.voiceNote, this.audioFilePath, this.initialTranscript})
     : assert(
         voiceNote != null || audioFilePath != null,
         'Either voiceNote or audioFilePath must be provided',
@@ -55,7 +56,9 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
     } else {
       _titleController = TextEditingController();
       _descriptionController = TextEditingController();
-      _transcriptController = TextEditingController();
+      _transcriptController = TextEditingController(
+        text: widget.initialTranscript ?? '',
+      );
       _tags = [];
     }
     _tagController = TextEditingController();
@@ -470,6 +473,7 @@ class _AddEditNoteScreenState extends State<AddEditNoteScreen> {
         description: _descriptionController.text.trim(),
         filePath: audioFilePath,
         tags: _tags,
+        transcript: _transcriptController.text.trim(),
       );
       // If there was a live transcript, persist edits if any
       if (success && _transcriptController.text.trim().isNotEmpty) {

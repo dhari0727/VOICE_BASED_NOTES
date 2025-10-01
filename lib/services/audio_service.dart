@@ -3,7 +3,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:audioplayers/audioplayers.dart' as audio;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:voice_based_notes/services/transcription_service.dart';
+import 'transcription_service.dart';
 
 enum AudioState { recording, playing, paused, stopped, ready }
 

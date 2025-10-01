@@ -91,10 +91,10 @@ class _RecordingFABState extends State<RecordingFAB>
     VoiceNotesProvider provider,
   ) async {
     if (provider.isRecording) {
-      // Stop recording
-      final filePath = await provider.stopRecording();
-      if (filePath != null) {
-        _navigateToAddNote(context, filePath);
+      // Stop recording and fetch final transcript
+      final result = await provider.stopRecordingAndGetTranscript();
+      if (result != null && result['path'] != null) {
+        _navigateToAddNote(context, result['path']!, initialTranscript: result['transcript']);
       } else if (provider.error != null) {
         _showErrorSnackBar(context, provider.error!);
       }
@@ -107,11 +107,14 @@ class _RecordingFABState extends State<RecordingFAB>
     }
   }
 
-  void _navigateToAddNote(BuildContext context, String filePath) {
+  void _navigateToAddNote(BuildContext context, String filePath, {String? initialTranscript}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddEditNoteScreen(audioFilePath: filePath),
+        builder: (context) => AddEditNoteScreen(
+          audioFilePath: filePath,
+          initialTranscript: initialTranscript,
+        ),
       ),
     );
   }

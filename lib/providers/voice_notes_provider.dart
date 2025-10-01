@@ -182,6 +182,22 @@ class VoiceNotesProvider with ChangeNotifier {
     }
   }
 
+  /// Stop recording and return both the saved audio path and final transcript.
+  /// Uses AudioService.stopRecordingAndGetTranscript for reliable finalization.
+  Future<Map<String, String?>?> stopRecordingAndGetTranscript() async {
+    try {
+      _error = null;
+      final result = await _audioService.stopRecordingAndGetTranscript();
+      // Sync provider live transcript state for subsequent save if needed
+      _liveTranscript = result['transcript'] ?? _liveTranscript;
+      return result;
+    } catch (e) {
+      _error = 'Failed to stop recording: $e';
+      notifyListeners();
+      return null;
+    }
+  }
+
   // Playback methods
   Future<void> playVoiceNote(VoiceNote voiceNote) async {
     try {
@@ -229,6 +245,7 @@ class VoiceNotesProvider with ChangeNotifier {
     required String description,
     required String filePath,
     required List<String> tags,
+    String? transcript,
   }) async {
     try {
       _error = null;
@@ -244,7 +261,9 @@ class VoiceNotesProvider with ChangeNotifier {
         tags: tags,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        transcript: _liveTranscript,
+        transcript: (transcript != null && transcript.trim().isNotEmpty)
+            ? transcript.trim()
+            : _liveTranscript,
         languageCode: _languageCode,
       );
 
